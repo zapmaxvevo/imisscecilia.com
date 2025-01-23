@@ -1,6 +1,6 @@
 import Head from "next/head"
 import Link from "next/link"
-import { useContext, useState } from "react"
+import { useContext, useState, useEffect } from "react"
 import useSWR, { useSWRConfig } from "swr"
 import { API_EPOCH, API_ROUTES, STREAM_STATUS } from "../common/enums"
 import { CommonFooter, CommonMetadata } from "../components/page_meta"
@@ -307,10 +307,10 @@ async function refreshStreamInfo(url, debug) {
 }
 
 export default function Home(props) {
-    const [debugMockType, setDebugMockType] = useState("")
-    const [isStaleOnArrival, setStaleOnArrival] = useState(props.staleOnArrival)
+    const [debugMockType, setDebugMockType] = useState("");
+    const [isStaleOnArrival, setStaleOnArrival] = useState(props.staleOnArrival);
 
-    const { mutate } = useSWRConfig()
+    const { mutate } = useSWRConfig();
     const { data } = useSWR(API_ROUTES.STREAM_INFO, (url) => refreshStreamInfo(url, debugMockType), {
         fallbackData: {
             status: props.dynamic.status,
@@ -321,61 +321,94 @@ export default function Home(props) {
         revalidateOnReconnect: true,
         revalidateIfStale: true,
         refreshInterval: 90000,
-    })
+    });
+
+    useEffect(() => {
+        let buffer = "";
+    
+        const handleKeyDown = (event) => {
+            buffer += event.key.toLowerCase(); 
+            if (buffer.endsWith("spin")) {
+                const body = document.body;
+    
+
+                body.style.transition = "transform 1s ease-in-out";
+                body.style.transform = "rotate(360deg)";
+    
+
+                setTimeout(() => {
+                    body.style.transition = "";
+                    body.style.transform = "rotate(0deg)"; 
+                }, 1000);
+    
+                buffer = ""; 
+            } else if (buffer.length > 4) {
+                buffer = buffer.slice(-4); 
+            }
+        };
+    
+        document.addEventListener("keydown", handleKeyDown);
+    
+        return () => {
+            document.removeEventListener("keydown", handleKeyDown); 
+        };
+    }, []);
 
     if (isStaleOnArrival) {
-        setTimeout(() => mutate(API_ROUTES.STREAM_INFO), 5000)
-        setStaleOnArrival(false)
+        setTimeout(() => mutate(API_ROUTES.STREAM_INFO), 5000);
+        setStaleOnArrival(false);
     }
 
     const [statusBase, setStatusBase] = useState(() => ({
         status: data.status,
         initialImage: props.dynamic.initialImage,
-        usedImageSet: scrambledImageSet(data)
-    }))
+        usedImageSet: scrambledImageSet(data),
+    }));
 
-    let effectiveStatusBase = statusBase
+    let effectiveStatusBase = statusBase;
     if (data.status !== statusBase.status) {
         const nextSB = {
             status: data.status,
             initialImage: imageFromStreamStatus(data.status),
-            usedImageSet: scrambledImageSet(data)
-        }
-        setStatusBase(nextSB)
-        mutate(API_ROUTES.PAST_STREAM_INFO)
-        effectiveStatusBase = nextSB
+            usedImageSet: scrambledImageSet(data),
+        };
+        setStatusBase(nextSB);
+        mutate(API_ROUTES.PAST_STREAM_INFO);
+        effectiveStatusBase = nextSB;
     }
 
     const layoutCommonProps = {
         absolutePrefix: props.absolutePrefix,
         channelLink: props.channelLink,
         streamInfo: data.streamInfo,
-        ...effectiveStatusBase
-    }
+        ...effectiveStatusBase,
+    };
 
-    let layout
+    let layout;
     if (props.dynamic.isError || data.status === undefined) {
-        layout = <ErrorLayout {...layoutCommonProps} />
+        layout = <ErrorLayout {...layoutCommonProps} />;
     } else {
         switch (data.status) {
             case STREAM_STATUS.LIVE:
             case STREAM_STATUS.STARTING_SOON:
-                layout = <LiveOrStartingSoonLayout {...layoutCommonProps} />
-                break
+                layout = <LiveOrStartingSoonLayout {...layoutCommonProps} />;
+                break;
             case STREAM_STATUS.OFFLINE:
             case STREAM_STATUS.INDETERMINATE:
-                layout = <NoStreamLayout {...layoutCommonProps} />
-                break
+                layout = <NoStreamLayout {...layoutCommonProps} />;
+                break;
         }
     }
 
-    if (!layout) throw "Layout not set."
+    if (!layout) throw "Layout not set.";
 
-    return <LangContext.Provider value={useLocalizationForRootComponentsOnly()}>
-        <div className={styles.site}>
-            <CommonMetadata />
-            {layout}
-            {props.showDebugBar ? <DebugBar mutate={mutate} setQueryString={setDebugMockType} /> : null}
-        </div>
-    </LangContext.Provider>
+    return (
+        <LangContext.Provider value={useLocalizationForRootComponentsOnly()}>
+            <div className={styles.site}>
+                <CommonMetadata />
+                {layout}
+                {props.showDebugBar ? <DebugBar mutate={mutate} setQueryString={setDebugMockType} /> : null}
+            </div>
+        </LangContext.Provider>
+    );
 }
