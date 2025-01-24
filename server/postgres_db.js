@@ -9,15 +9,29 @@ export class PostgresCoordinator {
     async _connect() {
         for (let i = 0; i < 3; ++i) {
             try {
-                this.connection = new Client({connectionTimeoutMillis: 1500})
-                await this.connection.connect()
-                return this
+                this.connection = new Client({
+                    user: process.env.PGUSER,
+                    host: process.env.PGHOST,
+                    database: process.env.PGDATABASE, 
+                    password: process.env.PGPASSWORD,
+                    port: process.env.PGPORT,
+                    connectionTimeoutMillis: 1500,
+                    ssl: {
+                        rejectUnauthorized: false,
+                    },
+                });
+    
+                // Intenta conectar
+                await this.connection.connect();
+                console.log("Connected to the database");
+                return this;
             } catch (e) {
-                console.error("[_connect]", "error connecting", e)
+                console.error("[_connect]", "Error connecting", e);
             }
         }
-
-        throw new Error("[_connect]: all connection attempts failed")
+    
+        // Si después de 3 intentos no se conecta, lanza un error
+        throw new Error("[_connect]: all connection attempts failed");
     }
 
     async getCachedStreamInfo(nearTime) {
